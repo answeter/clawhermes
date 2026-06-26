@@ -1,0 +1,19 @@
+# ============================================
+# 消息渠道配置 — 微信 / 企业微信（v0.14.0+ 可用）
+# ============================================
+# 配置文件：~/.clawhermes/channels/wechat.yaml
+# 敏感值：存放在 .env（WECHAT_SESSION_KEY / WECOM_BOT_KEY）
+# 引用语法：${WECHAT_SESSION_KEY} → 从环境变量注入
+# ============================================
+
+channel_type: wechat
+enabled: true
+
+# ── 子类型 ────────────────────────────────────────────────────────
+sub_type: personal                # personal（个人微信 iLink Bot）| enterprise（企业微信 Webhook）
+
+# ── 个人微信 — iLink Bot API（从 .env 注入）───────────────────────
+session_key: "${WECHAT_SESSION_KEY}"
+
+# ── 企业微信 — Webhook（从 .env 注入）────────────────────────────
+bot_key: "${WECOM_BOT_KEY}"

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClawHermes - Simple Test</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fas fa-robot"></i>
+                    <h1>ClawHermes</h1>
+                </div>
+                <button class="new-chat-btn" id="newChatBtn">
+                    <i class="fas fa-plus"></i>
+                    <span>新对话</span>
+                </button>
+            </div>
+            <div class="sessions-list" id="sessionsList">
+            </div>
+            <div class="sidebar-footer">
+                <button class="tools-btn" id="toolsBtn">
+                    <i class="fas fa-tools"></i>
+                    <span>工具</span>
+                </button>
+                <button class="settings-btn" id="settingsBtn">
+                    <i class="fas fa-cog"></i>
+                    <span>设置</span>
+                </button>
+            </div>
+        </aside>
+
+        <main class="chat-container">
+            <div class="welcome-screen" id="welcomeScreen">
+                <div class="welcome-content">
+                    <div class="welcome-logo">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h2>欢迎使用 ClawHermes</h2>
+                    <p>智能 AI 助手，为你提供强大的工具和智能对话能力</p>
+                    <div class="quick-actions">
+                        <button class="quick-action" data-prompt="帮我写一个 Python 脚本">
+                            <i class="fas fa-code"></i>
+                            <span>写代码</span>
+                        </button>
+                        <button class="quick-action" data-prompt="给我推荐几本好书">
+                            <i class="fas fa-book"></i>
+                            <span>推荐</span>
+                        </button>
+                        <button class="quick-action" data-prompt="帮我分析一下这个问题">
+                            <i class="fas fa-lightbulb"></i>
+                            <span>分析</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="messages-container" id="messagesContainer">
+            </div>
+
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <textarea id="messageInput" placeholder="输入你的消息..." rows="1"></textarea>
+                    <button class="stop-btn" id="stopBtn" style="display: none;">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                    <button class="send-btn" id="sendBtn">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="input-hint">
+                    <span>按 Enter 发送，Shift + Enter 换行</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal-overlay" id="toolsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>可用工具</h3>
+                <button class="close-btn" id="closeToolsModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="toolsList">
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>设置</h3>
+                <button class="close-btn" id="closeSettingsModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-item">
+                    <label>模型</label>
+                    <select id="modelSelect">
+                        <option value="deepseek/deepseek-chat">DeepSeek Chat</option>
+                        <option value="openai/gpt-4">GPT-4</option>
+                        <option value="anthropic/claude-3-sonnet">Claude 3 Sonnet</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>工具集</label>
+                    <select id="profileSelect">
+                        <option value="minimal">Minimal (5个工具)</option>
+                        <option value="standard" selected>Standard (9个工具)</option>
+                        <option value="full">Full (35个工具)</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>API 地址</label>
+                    <input type="text" id="apiUrl" value="http://127.0.0.1:18789" placeholder="http://127.0.0.1:18789">
+                </div>
+                <button class="save-settings-btn" id="saveSettingsBtn">保存设置</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Page loaded');
+    
+    const apiBaseUrl = localStorage.getItem('apiUrl') || 'http://127.0.0.1:18789';
+    let currentSessionId = null;
+    let sessions = [];
+    let isInitialized = false;
+    let currentRequest = null;
+    let isRequesting = false;
+    
+    const newChatBtn = document.getElementById('newChatBtn');
+    const sendBtn = document.getElementById('sendBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const messageInput = document.getElementById('messageInput');
+    const toolsBtn = document.getElementById('toolsBtn');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const closeToolsModal = document.getElementById('closeToolsModal');
+    const closeSettingsModal = document.getElementById('closeSettingsModal');
+    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+    const welcomeScreen = document.getElementById('welcomeScreen');
+    const messagesContainer = document.getElementById('messagesContainer');
+    const sessionsList = document.getElementById('sessionsList');
+    
+    newChatBtn.addEventListener('click', function() {
+        currentSessionId = null;
+        messagesContainer.innerHTML = '';
+        welcomeScreen.style.display = 'flex';
+        messagesContainer.classList.remove('active');
+        updateSessionsList();
+    });
+    
+    sendBtn.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+    
+    stopBtn.addEventListener('click', stopMessage);
+    
+    document.querySelectorAll('.quick-action').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const prompt = btn.dataset.prompt;
+            currentSessionId = null;
+            messagesContainer.innerHTML = '';
+            welcomeScreen.style.display = 'none';
+            messagesContainer.classList.add('active');
+            sendMessage(prompt);
+        });
+    });
+    
+    toolsBtn.addEventListener('click', async function() {
+        document.getElementById('toolsModal').classList.add('active');
+        await loadTools();
+    });
+    
+    closeToolsModal.addEventListener('click', function() {
+        document.getElementById('toolsModal').classList.remove('active');
+    });
+    
+    settingsBtn.addEventListener('click', function() {
+        document.getElementById('modelSelect').value = localStorage.getItem('model') || 'deepseek/deepseek-chat';
+        document.getElementById('profileSelect').value = localStorage.getItem('profile') || 'standard';
+        document.getElementById('apiUrl').value = localStorage.getItem('apiUrl') || 'http://127.0.0.1:18789';
+        document.getElementById('settingsModal').classList.add('active');
+    });
+    
+    closeSettingsModal.addEventListener('click', function() {
+        document.getElementById('settingsModal').classList.remove('active');
+    });
+    
+    saveSettingsBtn.addEventListener('click', function() {
+        localStorage.setItem('model', document.getElementById('modelSelect').value);
+        localStorage.setItem('profile', document.getElementById('profileSelect').value);
+        localStorage.setItem('apiUrl', document.getElementById('apiUrl').value);
+        document.getElementById('settingsModal').classList.remove('active');
+        alert('设置已保存！');
+    });
+    
+    document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
+        overlay.addEventListener('click', function(e) {
+            if (e.target === overlay) {
+                overlay.classList.remove('active');
+            }
+        });
+    });
+    
+    messageInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+    });
+    
+    async function loadTools() {
+        const toolsList = document.getElementById('toolsList');
+        try {
+            const response = await fetch(apiBaseUrl + '/tools');
+            const data = await response.json();
+            if (data.tools && data.tools.length > 0) {
+                toolsList.innerHTML = data.tools.map(function(tool) {
+                    // 处理不同的工具数据格式
+                    let name = 'unknown';
+                    let description = '暂无描述';
+                    
+                    if (typeof tool === 'string') {
+                        name = tool;
+                    } else if (typeof tool === 'object') {
+                        name = tool.name || tool.function?.name || tool.title || 'unknown';
+                        description = tool.description || tool.function?.description || tool.desc || '暂无描述';
+                    }
+                    
+                    return '<div class="tool-item"><h4><i class="fas fa-wrench"></i> ' + name + '</h4><p>' + description + '</p></div>';
+                }).join('');
+            } else {
+                toolsList.innerHTML = '<p style="text-align: center; color: #888;">暂无工具信息</p>';
+            }
+        } catch (error) {
+            console.error('加载工具失败', error);
+            toolsList.innerHTML = '<p style="text-align: center; color: #888;">无法加载工具列表</p>';
+        }
+    }
+    
+    function updateSessionsList() {
+        sessionsList.innerHTML = '';
+        sessions.forEach(function(session) {
+            const item = document.createElement('div');
+            item.className = 'session-item' + (session.id === currentSessionId ? ' active' : '');
+            item.innerHTML = '<i class="fas fa-comment"></i><span>' + session.title + '</span>';
+            sessionsList.appendChild(item);
+        });
+    }
+    
+    function addMessage(content, role) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message ' + role;
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        avatar.innerHTML = role === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+        bubble.innerHTML = content.replace(/\n/g, '<br>');
+        
+        contentDiv.appendChild(bubble);
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(contentDiv);
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    
+    function showTypingIndicator() {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message assistant typing-message';
+        messageDiv.innerHTML = '<div class="message-avatar"><i class="fas fa-robot"></i></div><div class="message-content"><div class="message-bubble"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div></div>';
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        return messageDiv;
+    }
+    
+    function removeTypingIndicator(element) {
+        if (element && element.parentNode) {
+            element.parentNode.removeChild(element);
+        }
+    }
+    
+    function setRequestingState(requesting) {
+        isRequesting = requesting;
+        if (requesting) {
+            sendBtn.style.display = 'none';
+            stopBtn.style.display = 'flex';
+            messageInput.disabled = true;
+            messageInput.style.opacity = '0.5';
+        } else {
+            sendBtn.style.display = 'flex';
+            stopBtn.style.display = 'none';
+            messageInput.disabled = false;
+            messageInput.style.opacity = '1';
+            currentRequest = null;
+        }
+    }
+    
+    async function sendMessage(messageText) {
+        if (isRequesting) return;
+        
+        const message = messageText || messageInput.value.trim();
+        
+        if (!message) return;
+        
+        welcomeScreen.style.display = 'none';
+        messagesContainer.classList.add('active');
+        
+        addMessage(message, 'user');
+        
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
+        
+        setRequestingState(true);
+        const typingIndicator = showTypingIndicator();
+        
+        try {
+            let responseData;
+            try {
+                const controller = new AbortController();
+                currentRequest = controller;
+                
+                const response = await fetch(apiBaseUrl + '/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: message,
+                        session_id: currentSessionId
+                    }),
+                    signal: controller.signal
+                });
+                
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                
+                responseData = await response.json();
+                removeTypingIndicator(typingIndicator);
+                addMessage(responseData.response, 'assistant');
+                
+                if (!currentSessionId) {
+                    currentSessionId = responseData.session_id;
+                    const session = {
+                        id: currentSessionId,
+                        title: message.substring(0, 30) + (message.length > 30 ? '...' : ''),
+                        timestamp: Date.now()
+                    };
+                    sessions.unshift(session);
+                    localStorage.setItem('clawhermes_sessions', JSON.stringify(sessions));
+                    updateSessionsList();
+                }
+            } catch (apiError) {
+                if (apiError.name === 'AbortError') {
+                    removeTypingIndicator(typingIndicator);
+                    addMessage('请求已停止', 'assistant');
+                } else {
+                    removeTypingIndicator(typingIndicator);
+                    addMessage('API 连接失败，请确保 Gateway 已启动。这是一个测试回复：我收到了你的消息："' + message + '"', 'assistant');
+                }
+            }
+        } catch (error) {
+            removeTypingIndicator(typingIndicator);
+            addMessage('抱歉，发生了错误：' + error.message, 'assistant');
+        } finally {
+            setRequestingState(false);
+        }
+    }
+    
+    function stopMessage() {
+        if (currentRequest) {
+            currentRequest.abort();
+        }
+    }
+    
+    const saved = localStorage.getItem('clawhermes_sessions');
+    if (saved) {
+        sessions = JSON.parse(saved);
+        updateSessionsList();
+    }
+});
+</script>
+</body>
+</html>
