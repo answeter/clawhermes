@@ -2,7 +2,7 @@
 // ClawHermes 前端应用
 class ClawHermesApp {
     constructor() {
-        this.apiBaseUrl = localStorage.getItem('apiUrl') || 'http://127.0.0.1:18789';
+        this.apiBaseUrl = localStorage.getItem('apiUrl') || 'https://clawhermes-production.up.railway.app';
         this.currentSessionId = null;
         this.sessions = [];
         this.isInitialized = false;
