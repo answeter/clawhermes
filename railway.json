@@ -1,0 +1,27 @@
+{
+  "services": [
+    {
+      "name": "clawhermes",
+      "build": {
+        "builder": "DOCKERFILE"
+      }
+    },
+    {
+      "name": "shimmering-web",
+      "source": {
+        "repo": "answeter/clawhermes",
+        "branch": "main"
+      },
+      "build": {
+        "builder": "NIXPACKS"
+      },
+      "deploy": {
+        "startCommand": "python -m http.server 8000 --directory web",
+        "healthcheckPath": "/"
+      },
+      "networking": {
+        "port": 8000
+      }
+    }
+  ]
+}
