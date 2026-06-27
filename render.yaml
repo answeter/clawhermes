@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: clawhermes-gateway
+    env: python
+    plan: free
+    buildCommand: |
+      pip install uv
+      uv sync --frozen
+    startCommand: |
+      uv run clawhermes gateway start
+    envVars:
+      - key: CH_DATA_DIR
+        value: /opt/render/project/src/data
+      - key: DEEPSEEK_API_KEY
+        fromSecret: deepseek_api_key
+    disk:
+      name: data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
+
+  - type: static
+    name: clawhermes-web
+    env: static
+    plan: free
+    staticPublishPath: ./web
+    buildCommand: echo "No build needed"
